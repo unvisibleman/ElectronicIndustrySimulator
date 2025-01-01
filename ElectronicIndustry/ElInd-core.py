@@ -188,6 +188,9 @@ class Game:
                 if self.check_bankruptcy():
                     return
                 print(self.DIVIDERS['simple'])
+            elif self.year == 1945:
+                print(self.HEADERS['achievement'])
+                print(f"{c['yellow']}Великая Отечественная война закончилась!{c['end']}")
                 print(self.DIVIDERS['simple'])
             elif self.year == 1952:
                 print(self.HEADERS['achievement'])
@@ -413,25 +416,32 @@ class Game:
         return final_price
 
     def produce_product(self, product_name):
-        if product_name in self.tecnologies.get_status():
-            tech_status = self.tecnologies.get_status()[product_name]
-            year_learned = tech_status["год освоения"]
-            
-            # Рассчитываем базовую цену с учетом уровня технологии
-            base_price = self.BASE_PRODUCT_PRICE
-            if tech_status["уровень"] == "средняя":
-                base_price *= 1.5
-            elif tech_status["уровень"] == "продвинутая":
-                base_price *= 2.0
-            
-            # Рассчитываем итоговую цену с учетом устаревания и населения
-            price = self.calculate_depreciation(base_price, year_learned)
-            
-            self.products[product_name] = self.products.get(product_name, 0) + 1
-            self.rubles += price
-            print(f"Произведен {product_name}. Доход от продажи: {price:.2f} рублей")
-        else:
+        tech_status = self.tecnologies.get_status()
+        if product_name not in tech_status:
             print("Технология для производства не освоена.")
+            return
+            
+        tech_details = tech_status[product_name]
+        if tech_details.get("уровень") == "исследуется":
+            print(f"Технология {product_name} еще исследуется. Текущий прогресс: {tech_details['прогресс']}")
+            return
+            
+        year_learned = tech_details["год освоения"]
+        current_level = tech_details["уровень"]
+        
+        # Рассчитываем базовую цену с учетом уровня технологии
+        base_price = self.BASE_PRODUCT_PRICE
+        if current_level == "средняя":
+            base_price *= 1.5
+        elif current_level == "продвинутая":
+            base_price *= 2.0
+        
+        # Рассчитываем итоговую цену с учетом устаревания и населения
+        price = self.calculate_depreciation(base_price, year_learned)
+        
+        self.products[product_name] = self.products.get(product_name, 0) + 1
+        self.rubles += price
+        print(f"Произведен {product_name}. Доход от продажи: {price:.2f} рублей")
 
     # Продажа технологий за рубеж
     def sell_technology(self, tech_name):
