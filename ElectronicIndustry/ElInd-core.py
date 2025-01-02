@@ -1,6 +1,6 @@
 import numpy as np
 
-class Game:
+class UI:
     def __init__(self):
         self.COLORS = {
             'red': '\033[91m',
@@ -15,20 +15,61 @@ class Game:
             'end': '\033[0m'
         }
         
-        # Добавляем форматирование заголовков и разделителей
-        c = self.COLORS
-        self.HEADERS = {
-            'event': f"\n{c['bold']}!!! ВАЖНОЕ СОБЫТИЕ !!!{c['end']}",
-            'war': f"\n{c['bold']}{c['red']}!!! ВОЕННОЕ ПОЛОЖЕНИЕ !!!{c['end']}",
-            'achievement': f"\n{c['bold']}{c['green']}!!! ДОСТИЖЕНИЕ !!!{c['end']}",
-            'bankruptcy': f"\n{c['bold']}{c['red']}!!! БАНКРОТСТВО !!!{c['end']}"
-        }
+        # Создаем атрибуты для каждого цвета/стиля
+        for name, code in self.COLORS.items():
+            setattr(self, name, code)
+    
+    def print(self, *args):
+        """
+        Печатает текст с применением цветов и стилей.
+        Использование:
+        ui.print(ui.red, ui.bold, 'текст')
+        ui.print('обычный текст')
+        """
+        text = ''
+        styles = []
         
-        self.DIVIDERS = {
-            'simple': f"{c['white']}------------------------{c['end']}",
-            'double': f"{c['white']}========================{c['end']}",
-            'status': f"{c['white']}-----------------------{c['end']}"
+        for arg in args:
+            if arg in self.COLORS.values():
+                styles.append(arg)
+            else:
+                text += str(arg)
+        
+        # Применяем стили и автоматически добавляем end
+        print(''.join(styles) + text + self.end)
+    
+    def header(self, text, style='event'):
+        """
+        Печатает заголовок определенного типа.
+        Стили: event, war, achievement, bankruptcy
+        """
+        headers = {
+            'event': f"\n{self.bold}!!! ВАЖНОЕ СОБЫТИЕ !!!{self.end}",
+            'war': f"\n{self.bold}{self.red}!!! ВОЕННОЕ ПОЛОЖЕНИЕ !!!{self.end}",
+            'achievement': f"\n{self.bold}{self.green}!!! ДОСТИЖЕНИЕ !!!{self.end}",
+            'bankruptcy': f"\n{self.bold}{self.red}!!! БАНКРОТСТВО !!!{self.end}"
         }
+        print(headers.get(style, headers['event']))
+        self.print(text)
+    
+    def divider(self, style='simple'):
+        """
+        Печатает разделитель определенного типа.
+        Стили: simple, double, status
+        """
+        dividers = {
+            'simple': f"{self.white}------------------------{self.end}",
+            'double': f"{self.white}========================{self.end}",
+            'status': f"{self.white}-----------------------{self.end}"
+        }
+        print(dividers.get(style, dividers['simple']))
+
+# Создаем глобальный экземпляр UI
+ui = UI()
+
+class Game:
+    def __init__(self):
+        self.ui = ui
         
         self.year = 1918
         self.five_year_plans = []
@@ -106,7 +147,7 @@ class Game:
                 }
             },
             "мис": {
-                "описание": "Микросхемы средней степени интеграции",
+                "описание": "Микросхемы средней степени интеграции - до 100 элементов на кристалле",
                 "уровни": {
                     "начальная": "Простые функциональные узлы",
                     "средняя": "Сложные логические блоки",
@@ -122,7 +163,7 @@ class Game:
                 }
             },
             "сис": {
-                "описание": "Схемы с высокой степенью интеграции",
+                "описание": "Схемы с высокой степенью интеграции - до 1 000 элементов на кристалле",
                 "уровни": {
                     "начальная": "Простые микропроцессоры",
                     "средняя": "Микроконтроллеры",
@@ -130,7 +171,7 @@ class Game:
                 }
             },
             "бис": {
-                "описание": "Большие интегральные схемы",
+                "описание": "Большие интегральные схемы - до 10 000 элементов на кристалле",
                 "уровни": {
                     "начальная": "Простые микропроцессоры",
                     "средняя": "Сопроцессоры и контроллеры",
@@ -146,7 +187,7 @@ class Game:
                 }
             },
             "сбис": {
-                "описание": "Сверхбольшие интегральные схемы",
+                "описание": "Сверхбольшие интегральные схемы - более 10 000 элементов на кристалле",
                 "уровни": {
                     "начальная": "Базовые СБИС",
                     "средняя": "Сложные процессоры",
@@ -162,73 +203,61 @@ class Game:
 
     def main_loop(self):
         while True:
-            c = self.COLORS
+            c = self.ui.COLORS
             # Проверка исторических событий
             if self.year == 1924:
-                print(self.HEADERS['event'])
-                print(f"{c['yellow']}Начало выпуска журнала Радио!{c['end']}")
-                print(self.DIVIDERS['simple'])
+                self.ui.header('Начало выпуска журнала Радио!', 'event')
+                self.ui.divider('simple')
             elif self.year == 1932:
-                print(self.HEADERS['event'])
-                print(f"{c['yellow']}Получены первые сведения о возможной угрозе войны с Германией!{c['end']}")
-                print(self.DIVIDERS['simple'])
+                self.ui.header('Получены первые сведения о возможной угрозе войны с Германией!', 'event')
+                self.ui.divider('simple')
             elif self.year == 1941:
-                print(self.HEADERS['war'])
-                print(f"{c['red']}Началась Великая Отечественная война!{c['end']}")
+                self.ui.header('Началась Великая Отечественная война!', 'war')
                 print(f"{c['red']}На эвакуацию заводов требуется 10000 рублей{c['end']}")
                 self.rubles -= 10000
                 if self.check_bankruptcy():
                     return
-                print(self.DIVIDERS['simple'])
+                self.ui.divider('simple')
             elif self.year > 1941 and self.year < 1945:
-                print(self.HEADERS['war'])
-                print(f"{c['red']}Великая Отечественная война продолжается!{c['end']}")
+                self.ui.header('Великая Отечественная война продолжается!', 'war')  
                 print(f"{c['red']}Фронту требуется 2000 рублей{c['end']}")
                 self.rubles -= 2000
                 if self.check_bankruptcy():
                     return
-                print(self.DIVIDERS['simple'])
+                self.ui.divider('simple')
             elif self.year == 1945:
-                print(self.HEADERS['achievement'])
-                print(f"{c['yellow']}Великая Отечественная война закончилась!{c['end']}")
-                print(self.DIVIDERS['simple'])
+                self.ui.header('Великая Отечественная война закончилась!', 'achievement')
+                self.ui.divider('simple')
             elif self.year == 1952:
-                print(self.HEADERS['achievement'])
-                print(f"{c['green']}Наши ученые построили первую в стране ЭВМ! Теперь вы можете использовать 2 команды в год!{c['end']}")
+                self.ui.header('Наши ученые построили первую в стране ЭВМ! Теперь вы можете использовать 2 команды в год!', 'achievement')
                 self.command_capacity = 2
-                print(self.DIVIDERS['simple'])
+                self.ui.divider('simple')
             elif self.year == 1956:
-                print(self.HEADERS['event'])
-                print("Начато проектирование первого искусственного спутника Земли!")
-                print("На это потребуется 10000 рублей")
+                self.ui.header('Начато проектирование первого искусственного спутника Земли!', 'event')
+                print(f"{c['red']}На это потребуется 10000 рублей{c['end']}")
                 self.rubles -= 10000
                 if self.check_bankruptcy():
                     return
-                print(self.DIVIDERS['simple'])
+                self.ui.divider('simple')
             elif self.year == 1957:
-                print(self.HEADERS['achievement'])
-                print("Успешный запуск первого искусственного спутника Земли!")
-                print(self.DIVIDERS['simple'])
+                self.ui.header('Успешный запуск первого искусственного спутника Земли!', 'achievement')
+                self.ui.divider('simple')
             elif self.year == 1958:
-                print(self.HEADERS['event'])
-                print("Начато проектирование пилотируемого космического корабля!")
-                print("На это потребуется 10000 рублей")
+                self.ui.header('Начато проектирование пилотируемого космического корабля!', 'event')
+                print(f"{c['red']}На это потребуется 10000 рублей{c['end']}")
                 self.rubles -= 10000
                 if self.check_bankruptcy():
                     return
-                print(self.DIVIDERS['simple'])
+                self.ui.divider('simple')
             elif self.year == 1961:
-                print(self.HEADERS['achievement'])
-                print("Юрий Гагарин стал первым человеком в космосе!")
-                print(self.DIVIDERS['simple'])
+                self.ui.header('Юрий Гагарин стал первым человеком в космосе!', 'achievement')
+                self.ui.divider('simple')
             elif self.year == 1984:
-                print(self.HEADERS['event'])
-                print("Начало выпуска журнала Микропроцессорные средства и системы!")
-                print(self.DIVIDERS['simple'])
+                self.ui.header('Начало выпуска журнала Микропроцессорные средства и системы!', 'event')
+                self.ui.divider('simple')
             elif self.year == 1991:
-                print(self.HEADERS['achievement'])
-                print("В этот год могла произойти контрреволюция!")
-                print(self.DIVIDERS['simple'])
+                self.ui.header('В этот год могла произойти контрреволюция!', 'achievement')
+                self.ui.divider('simple')
 
             commands = 0
             while commands < self.command_capacity:
@@ -249,23 +278,27 @@ class Game:
             self.year += 1
 
     def show_status(self):
-        c = self.COLORS
+        c = self.ui.COLORS
         print(f"{c['bold']}{c['blue']}Год: {self.year}{c['end']}")
-        print(f"{c['green']}Рубли: {self.rubles:.2f}{c['end']}, {c['yellow']}Доллары: {self.dollars:.2f}{c['end']}")
+        print(f"Деньги: {c['green']}{self.rubles:.2f} руб{c['end']}, {c['yellow']}${self.dollars:.2f}{c['end']}")
         print(f"{c['cyan']}Текущая пятилетка: {self.current_plan}{c['end']}")
         
         # Доступные технологии
         print(f"\n{c['magenta']}Доступные технологии:{c['end']}")
         available_techs = self.tecnologies.get_available_technologies(self.year)
-        if available_techs:
-            for tech in available_techs:
+        tech_status = self.tecnologies.get_status()
+        
+        # Фильтруем доступные технологии, исключая освоенные
+        new_techs = [tech for tech in available_techs if tech not in tech_status]
+        
+        if new_techs:
+            for tech in new_techs:
                 print(f"  • {tech}")
         else:
             print("  Нет доступных технологий")
         
         # Освоенные технологии
         print(f"\n{c['cyan']}Освоенные технологии:{c['end']}")
-        tech_status = self.tecnologies.get_status()
         if tech_status:
             for tech, details in tech_status.items():
                 if "уровень" in details and details["уровень"] != "исследуется":
@@ -275,14 +308,14 @@ class Game:
                         "продвинутая": c['green']
                     }.get(details["уровень"], c['white'])
                     
-                    print(f"  • {c['bold']}{tech}{c['end']} - {level_color}{details['уровень']}{c['end']} - Год освоения: {details['год освоения']}")
+                    print(f"  • {c['bold']}{tech}{c['end']} {level_color}{details['уровень']}{c['end']} Освоено в: {details['год освоения']}")
                 elif "уровень" in details and details["уровень"] == "исследуется":
                     print(f"  • {c['bold']}{tech}{c['end']} - {c['yellow']}{details['прогресс']}{c['end']}")
         else:
             print("  Нет освоенных технологий")
         
         print(f"\n{c['green']}Население: {self.population_stats.get_population():.2f} млн. человек{c['end']}")
-        print(self.DIVIDERS['status'])
+        self.ui.divider('status')
 
     def process_command(self, command):
         try:
@@ -330,16 +363,18 @@ class Game:
                     print("Использование: исследовать ТЕХНОЛОГИЯ [ТЕХНОЛОГИЯ ...]")
                     return "invalid"
                 self.tecnologies.update_current_year(self.year)
+                total_cost = 0
                 for tech in parts[1:]:
                     print(f"\nИсследование {tech}:")
-                    self.tecnologies.research(tech.lower(), self.rubles)
+                    cost = self.tecnologies.research(tech.lower(), self.rubles - total_cost)
+                    total_cost += cost
+                self.rubles -= total_cost  # Вычитаем общую стоимость исследований
                 return "valid"
             elif cmd == "произвести":
                 if len(parts) < 2:
                     print("Использование: произвести ТОВАР [ТОВАР ...]")
                     return "invalid"
                 for product in parts[1:]:
-                    print(f"\nПроизводство {product}:")
                     self.produce_product(product.lower())
                 return "valid"
             elif cmd == "продажа_технологий":
@@ -376,7 +411,7 @@ class Game:
             return "invalid"
 
     def help_command(self):
-        c = self.COLORS
+        c = self.ui.COLORS
         print(f"\n{c['bold']}{c['cyan']}Доступные команды:{c['end']}")
         print(f"{c['yellow']}помощь{c['end']} - вывести справку по командам")
         print(f"{c['yellow']}что_такое ТЕХНОЛОГИЯ{c['end']} - получить описание технологии")
@@ -464,10 +499,9 @@ class Game:
             print("Технология не освоена.")
 
     def check_bankruptcy(self):
-        c = self.COLORS
+        c = self.ui.COLORS
         if self.rubles < 0:
-            print(self.HEADERS['bankruptcy'])
-            print(f"{c['red']}Казна пуста! Промышленность в упадке!{c['end']}")
+            self.ui.header('Казна пуста! Промышленность в упадке!', 'bankruptcy')
             print(f"{c['yellow']}Итоговая статистика:{c['end']}")
             print(f"{c['white']}Год: {self.year}{c['end']}")
             
@@ -487,13 +521,13 @@ class Game:
                 print("  Нет освоенных технологий")
             
             print(f"{c['white']}Население: {self.population_stats.get_population():.2f} млн. человек{c['end']}")
-            print(self.DIVIDERS['double'])
+            self.ui.divider('double')
             print(f"{c['red']}Игра окончена!{c['end']}")
             return True
         return False
 
     def buy_technology(self, tech_name):
-        c = self.COLORS
+        c = self.ui.COLORS
         if tech_name not in self.tecnologies.get_available_technologies(self.year):
             print(f"{c['red']}Эта технология пока недоступна для покупки!{c['end']}")
             return
@@ -538,7 +572,7 @@ class Game:
         print(f"{c['green']}Технология {tech_name} успешно куплена!{c['end']}")
 
     def show_tech_info(self, tech_name):
-        c = self.COLORS
+        c = self.ui.COLORS
         if tech_name not in self.TECH_DESCRIPTIONS:
             print(f"{c['red']}Информация о технологии '{tech_name}' не найдена.{c['end']}")
             return
@@ -565,7 +599,7 @@ class Game:
             else:
                 print(f"\n{c['yellow']}Статус: {tech_status[tech_name]['прогресс']}{c['end']}")
         
-        print(self.DIVIDERS['simple'])
+        self.ui.divider('simple')
 
 
 class TechnologyTree:
@@ -681,37 +715,39 @@ class TechnologyTree:
             # Проверяем, можно ли улучшить технологию
             if current_level not in self.levels or self.levels[current_level]["upgrade"] is None:
                 print(f"{tech_name} уже достигла максимального уровня развития.")
-                return
+                return 0  # Возвращаем 0, так как деньги не потрачены
                 
             if year_available > self.current_year:
                 print(f"{tech_name} еще недоступна. Можно освоить позже.")
-                return
+                return 0  # Возвращаем 0, так как деньги не потрачены
                 
             if self.resources_required[tech_name] > available_rubles:
                 print(f"Недостаточно рублей для исследования {tech_name}. Необходимо: {self.resources_required[tech_name]}, доступно: {available_rubles}.")
-                return
+                return 0  # Возвращаем 0, так как деньги не потрачены
 
             # Проверяем, исследуется ли уже эта технология
             if tech_name not in self.research_in_progress:
                 self.research_in_progress[tech_name] = 0
                 print(f"Начато исследование {tech_name}. Требуется лет: {self.research_time[tech_name]}")
-                return
-
+                return self.resources_required[tech_name]  # Возвращаем стоимость исследования
+            
             # Увеличиваем счетчик лет исследования
             self.research_in_progress[tech_name] += 1
             years_left = self.research_time[tech_name] - self.research_in_progress[tech_name]
 
             if years_left > 0:
                 print(f"Исследование {tech_name} продолжается. Осталось лет: {years_left}")
-                return
+                return self.resources_required[tech_name]  # Возвращаем стоимость исследования
 
             # Исследование завершено
             next_level = self.levels[current_level]["upgrade"]
             self.technologies[tech_name] = (next_level, year_available, self.current_year)
             del self.research_in_progress[tech_name]  # Удаляем из списка исследуемых
             print(f"{tech_name} улучшена до уровня {next_level}.")
+            return self.resources_required[tech_name]  # Возвращаем стоимость исследования
         else:
             print("Технология не найдена.")
+            return 0  # Возвращаем 0, так как деньги не потрачены
 
     def update_current_year(self, year):
         self.current_year = year
