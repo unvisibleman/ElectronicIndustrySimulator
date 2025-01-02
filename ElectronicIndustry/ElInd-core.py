@@ -382,7 +382,6 @@ class Game:
                     print("Использование: продажа_технологий ТЕХНОЛОГИЯ [ТЕХНОЛОГИЯ ...]")
                     return "invalid"
                 for tech in parts[1:]:
-                    print(f"\nПродажа {tech}:")
                     self.sell_technology(tech.lower())
                 return "valid"
             elif cmd == "купить_технологию":
@@ -436,10 +435,18 @@ class Game:
         else:
             print("Нет активного пятилетнего плана.")
     
-    def calculate_depreciation(self, base_price, year_learned):
-        """Расчет цены с учетом устаревания и численности населения"""
+    def calculate_depreciation(self, base_price, year_learned, tech_name=None):
+        """Расчет цены с учетом устаревания, численности населения и количества продаж"""
         # Рассчитываем базовое устаревание
         years_passed = self.year - year_learned
+        
+        # Если это расчет для продажи технологии, учитываем количество предыдущих продаж
+        if tech_name:
+            sales_count = self.tecnologies.technology_sales.get(tech_name, 0)
+            # Увеличиваем скорость устаревания на 20% за каждую предыдущую продажу
+            depreciation_multiplier = 1 + (sales_count * self.tecnologies.SALES_DEPRECIATION_MULTIPLIER)
+            years_passed *= depreciation_multiplier
+        
         depreciation = base_price * (1 - self.DEPRECIATION_RATE * years_passed)
         base_deprecated_price = max(depreciation, base_price * 0.1)  # Минимальная цена 10% от базовой
 
@@ -491,12 +498,25 @@ class Game:
             elif tech_status["уровень"] == "продвинутая":
                 base_price *= 3.0
             
-            price = self.calculate_depreciation(base_price, year_learned)
+            # Получаем текущее количество продаж
+            sales_count = self.tecnologies.technology_sales.get(tech_name, 0)
+            
+            # Рассчитываем цену с учетом всех факторов
+            price = self.calculate_depreciation(base_price, year_learned, tech_name)
             
             self.dollars += price
-            print(f"Продажа технологии {tech_name} принесла {price:.2f} долларов")
+            
+            # Увеличиваем счетчик продаж
+            self.tecnologies.technology_sales[tech_name] = sales_count + 1
+            
+            # Выводим информацию о продаже
+            self.ui.print(f"Продажа технологии {tech_name} (продана {sales_count + 1} раз). Получено: ${price:.2f}")
+            
+            # Если продаж больше 3, выводим предупреждение
+            if sales_count + 1 >= 3:
+                self.ui.print(self.ui.yellow, "Внимание! Технология значительно устарела из-за множественных продаж.")
         else:
-            print("Технология не освоена.")
+            self.ui.print(self.ui.red, "Технология не освоена.")
 
     def check_bankruptcy(self):
         c = self.ui.COLORS
@@ -581,6 +601,11 @@ class Game:
         print(f"\n{c['bold']}{c['cyan']}Технология: {tech_name}{c['end']}")
         print(f"{c['white']}{tech_info['описание']}{c['end']}")
         
+        # Добавляем информацию о стоимости исследования
+        if tech_name in self.tecnologies.resources_required:
+            cost = self.tecnologies.resources_required[tech_name]
+            print(f"\n{c['yellow']}Стоимость исследования: {cost} руб.{c['end']}")
+        
         print(f"\n{c['yellow']}Уровни развития:{c['end']}")
         for level, desc in tech_info['уровни'].items():
             level_color = {
@@ -659,7 +684,7 @@ class TechnologyTree:
 
         # Ресурсы, необходимые для исследований
         self.resources_required = {
-            "пассивка": 100,
+            "пассивка": 50,
             "радиолампы": 150,
             "полупроводники": 200,
             "чбэлт": 250,
@@ -673,6 +698,12 @@ class TechnologyTree:
             "нжмд": 700,
             "сбис": 800,
         }
+
+        # Добавляем словарь для отслеживания количества продаж каждой технологии
+        self.technology_sales = {}
+        
+        # Коэффициент ускорения устаревания за каждую продажу
+        self.SALES_DEPRECIATION_MULTIPLIER = 0.2  # 20% ускорение устаревания за каждую продажу
 
     def get_available_technologies(self, current_year):
         """Возвращает список технологий, которые можно освоить в текущем году."""
@@ -719,17 +750,20 @@ class TechnologyTree:
                 
             if year_available > self.current_year:
                 print(f"{tech_name} еще недоступна. Можно освоить позже.")
-                return 0  # Возвращаем 0, так как деньги не потрачены
+                return 0
+            
+            required_cost = self.resources_required[tech_name]
+            print(f"Стоимость исследования: {required_cost} руб.")
                 
-            if self.resources_required[tech_name] > available_rubles:
-                print(f"Недостаточно рублей для исследования {tech_name}. Необходимо: {self.resources_required[tech_name]}, доступно: {available_rubles}.")
-                return 0  # Возвращаем 0, так как деньги не потрачены
+            if required_cost > available_rubles:
+                print(f"Недостаточно рублей для исследования. Доступно: {available_rubles} руб.")
+                return 0
 
             # Проверяем, исследуется ли уже эта технология
             if tech_name not in self.research_in_progress:
                 self.research_in_progress[tech_name] = 0
                 print(f"Начато исследование {tech_name}. Требуется лет: {self.research_time[tech_name]}")
-                return self.resources_required[tech_name]  # Возвращаем стоимость исследования
+                return required_cost # Возвращаем стоимость исследования
             
             # Увеличиваем счетчик лет исследования
             self.research_in_progress[tech_name] += 1
@@ -737,17 +771,17 @@ class TechnologyTree:
 
             if years_left > 0:
                 print(f"Исследование {tech_name} продолжается. Осталось лет: {years_left}")
-                return self.resources_required[tech_name]  # Возвращаем стоимость исследования
+                return required_cost # Возвращаем стоимость исследования
 
             # Исследование завершено
             next_level = self.levels[current_level]["upgrade"]
             self.technologies[tech_name] = (next_level, year_available, self.current_year)
-            del self.research_in_progress[tech_name]  # Удаляем из списка исследуемых
+            del self.research_in_progress[tech_name] # Удаляем из списка исследуемых
             print(f"{tech_name} улучшена до уровня {next_level}.")
-            return self.resources_required[tech_name]  # Возвращаем стоимость исследования
+            return required_cost # Возвращаем 0, так как деньги не потрачены
         else:
             print("Технология не найдена.")
-            return 0  # Возвращаем 0, так как деньги не потрачены
+            return 0 # Возвращаем 0, так как деньги не потрачены
 
     def update_current_year(self, year):
         self.current_year = year
