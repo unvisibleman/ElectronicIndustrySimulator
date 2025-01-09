@@ -1,202 +1,31 @@
-import numpy as np
-import os
-
-class UI:
-    def __init__(self):
-        self.COLORS = {
-            'red': '\033[91m',
-            'green': '\033[92m',
-            'yellow': '\033[93m',
-            'blue': '\033[94m',
-            'magenta': '\033[95m',
-            'cyan': '\033[96m',
-            'white': '\033[97m',
-            'bold': '\033[1m',
-            'underline': '\033[4m',
-            'end': '\033[0m'
-        }
-        
-        # Создаем атрибуты для каждого цвета/стиля
-        for name, code in self.COLORS.items():
-            setattr(self, name, code)
-    
-    def print(self, *args):
-        """
-        Печатает текст с применением цветов и стилей.
-        Использование:
-        ui.print(ui.red, ui.bold, 'текст')
-        ui.print('обычный текст')
-        """
-        text = ''
-        styles = []
-        
-        for arg in args:
-            if arg in self.COLORS.values():
-                styles.append(arg)
-            else:
-                text += str(arg)
-        
-        # Применяем стили и автоматически добавляем end
-        print(''.join(styles) + text + self.end)
-    
-    def header(self, text, style='event'):
-        """
-        Печатает заголовок определенного типа.
-        Стили: event, war, achievement, bankruptcy
-        """
-        headers = {
-            'event': f"\n{self.bold}!!! ВАЖНОЕ СОБЫТИЕ !!!{self.end}",
-            'war': f"\n{self.bold}{self.red}!!! ВОЕННОЕ ПОЛОЖЕНИЕ !!!{self.end}",
-            'achievement': f"\n{self.bold}{self.green}!!! ДОСТИЖЕНИЕ !!!{self.end}",
-            'bankruptcy': f"\n{self.bold}{self.red}!!! БАНКРОТСТВО !!!{self.end}"
-        }
-        print(headers.get(style, headers['event']))
-        self.print(text)
-    
-    def divider(self, style='simple'):
-        """
-        Печатает разделитель определенного типа.
-        Стили: simple, double, status
-        """
-        dividers = {
-            'simple': f"{self.white}------------------------{self.end}",
-            'double': f"{self.white}========================{self.end}",
-            'status': f"{self.white}-----------------------{self.end}"
-        }
-        print(dividers.get(style, dividers['simple']))
-
-# Создаем глобальный экземпляр UI
-ui = UI()
+from TechnologyTree import TechnologyTree
+from PopulationStats import PopulationStats
+from ConsumerProducts import ConsumerProducts
+from FiveYearPlan import FiveYearPlan
+from UI import UserInterface
 
 class Game:
     def __init__(self):
-        self.ui = ui
-        
         self.year = 1918
-        self.current_plan = None
+        self.rubles = 1000 # Начальное количество рублей
+        self.dollars = 500 # Начальное количество долларов
+        self.products = {} # Хранит информацию о произведенных товарах
+        self.consumer_products_made = {} # Статистика произведенных товаров
+        self.last_command = None # Добавляем сохранение последней команды
+        self.production_multiplier = 1 # Базовый множитель производительности
+        self.PRODUCTION_UPGRADE_COST_RUBLES = 5000 # Стоимость улучшения в рублях
+        self.PRODUCTION_UPGRADE_COST_DOLLARS = 1000 # Стоимость улучшения в долларах
+        self.PRODUCTION_UPGRADE_FACTOR = 2 # Во сколько раз увеличивается производство
+        self.DEPRECIATION_RATE = 0.1 # 10% обесценивание в год
+        self.ui = UserInterface()
         self.tecnologies = TechnologyTree()
-        self.rubles = 1000  # Начальное количество рублей
-        self.dollars = 500   # Начальное количество долларов
+        self.five_year_plan = FiveYearPlan()
         self.population_stats = PopulationStats()
-        self.products = {}  # Хранит информацию о произведенных товарах
-        self.DEPRECIATION_RATE = 0.1  # 10% обесценивание в год
-        self.last_command = None  # Добавляем сохранение последней команды
+        self.consumer_products = ConsumerProducts()
         self.research_in_progress = {}  # Добавляем словарь для отслеживания процесса исследования {tech_name: years_spent}
         self.BASE_POPULATION = 150  # Базовое население в млн (1926 год)
         self.POPULATION_PRICE_FACTOR = 1.5  # Коэффициент влияния населения на цену
         self.command_capacity = 1 # Количество команд в год
-        self.production_multiplier = 1  # Базовый множитель производства
-        self.PRODUCTION_UPGRADE_COST_RUBLES = 5000  # Стоимость улучшения в рублях
-        self.PRODUCTION_UPGRADE_COST_DOLLARS = 1000  # Стоимость улучшения в долларах
-        self.PRODUCTION_UPGRADE_FACTOR = 2  # Во сколько раз увеличивается производство
-        
-        # Добавляем описания технологий
-        self.TECH_DESCRIPTIONS = {
-            "пассивка": {
-                "описание": "Пассивные электронные компоненты - резисторы, конденсаторы, катушки индуктивности",
-                "уровни": {
-                    "начальная": "Производство простейших компонентов низкой точности",
-                    "средняя": "Улучшенная точность и стабильность характеристик",
-                    "продвинутая": "Прецизионные компоненты с высокой надежностью"
-                }
-            },
-            "радиолампы": {
-                "описание": "Электровакуумные приборы для усиления и генерации электрических сигналов",
-                "уровни": {
-                    "начальная": "Простые триоды и диоды",
-                    "средняя": "Многосеточные лампы, тетроды и пентоды",
-                    "продвинутая": "Специальные типы ламп, высокочастотные и мощные приборы"
-                }
-            },
-            "полупроводники": {
-                "описание": "Полупроводниковые приборы - диоды, транзисторы",
-                "уровни": {
-                    "начальная": "Простые германиевые диоды и транзисторы",
-                    "средняя": "Кремниевые транзисторы, стабилитроны",
-                    "продвинутая": "Мощные транзисторы, тиристоры, специальные приборы"
-                }
-            },
-            "чбэлт": {
-                "описание": "Черно-белые электронно-лучевые трубки для телевизоров и мониторов",
-                "уровни": {
-                    "начальная": "Простые ЭЛТ с низким разрешением",
-                    "средняя": "ЭЛТ с улучшенной фокусировкой и яркостью",
-                    "продвинутая": "Высококачественные ЭЛТ с высоким разрешением"
-                }
-            },
-            "нмл": {
-                "описание": "Накопители на магнитной ленте - устройства хранения данных",
-                "уровни": {
-                    "начальная": "Простые устройства с низкой плотностью записи",
-                    "средняя": "Улучшенные механизмы и повышенная надежность",
-                    "продвинутая": "Высокоскоростные НМЛ с высокой плотностью записи"
-                }
-            },
-            "ис": {
-                "описание": "Интегральные схемы малой степени интеграции",
-                "уровни": {
-                    "начальная": "Простые логические элементы",
-                    "средняя": "Операционные усилители, счетчики",
-                    "продвинутая": "Сложные функциональные блоки"
-                }
-            },
-            "цветнойэлт": {
-                "описание": "Цветные электронно-лучевые трубки для телевизоров",
-                "уровни": {
-                    "начальная": "Базовые цветные ЭЛТ",
-                    "средняя": "Улучшенная цветопередача и яркость",
-                    "продвинутая": "Высококачественные ЭЛТ с точной цветопередачей"
-                }
-            },
-            "мис": {
-                "описание": "Микросхемы средней степени интеграции - до 100 элементов на кристалле",
-                "уровни": {
-                    "начальная": "Простые функциональные узлы",
-                    "средняя": "Сложные логические блоки",
-                    "продвинутая": "Процессорные элементы и память"
-                }
-            },
-            "нгмд": {
-                "описание": "Накопители на гибких магнитных дисках",
-                "уровни": {
-                    "начальная": "8-дюймовые дискеты",
-                    "средняя": "5.25-дюймовые дискеты",
-                    "продвинутая": "3.5-дюймовые дискеты высокой плотности"
-                }
-            },
-            "сис": {
-                "описание": "Схемы с высокой степенью интеграции - до 1 000 элементов на кристалле",
-                "уровни": {
-                    "начальная": "Простые микропроцессоры",
-                    "средняя": "Микроконтроллеры",
-                    "продвинутая": "Специализированные процессоры"
-                }
-            },
-            "бис": {
-                "описание": "Большие интегральные схемы - до 10 000 элементов на кристалле",
-                "уровни": {
-                    "начальная": "Простые микропроцессоры",
-                    "средняя": "Сопроцессоры и контроллеры",
-                    "продвинутая": "Мощные процессоры и память"
-                }
-            },
-            "нжмд": {
-                "описание": "Накопители на жестких магнитных дисках",
-                "уровни": {
-                    "начальная": "Диски малой емкости",
-                    "средняя": "Улучшенные механизмы и контроллеры",
-                    "продвинутая": "Высокоскоростные диски большой емкости"
-                }
-            },
-            "сбис": {
-                "описание": "Сверхбольшие интегральные схемы - более 10 000 элементов на кристалле",
-                "уровни": {
-                    "начальная": "Базовые СБИС",
-                    "средняя": "Сложные процессоры",
-                    "продвинутая": "Многоядерные процессоры и видеочипы"
-                }
-            }
-        }
 
         # Добавляем информацию о денежных реформах
         self.MONETARY_REFORMS = {
@@ -217,186 +46,6 @@ class Game:
             }
         }
 
-        # Рецепты производства товаров народного потребления и военной техники
-        self.CONSUMER_PRODUCTS = {
-            "радиоприемник_ламповый": {
-                "components": {
-                    "пассивка": 5,
-                    "радиолампы": 5
-                },
-                "price": 1000,  # базовая цена в рублях
-                "description": "Ламповый радиоприемник"
-            },
-            "телевизор_чб_ламповый": {
-                "components": {
-                    "пассивка": 20,
-                    "радиолампы": 10,
-                    "чбэлт": 1
-                },
-                "price": 2500,
-                "description": "Черно-белый ламповый телевизор"
-            },
-            "военная_радиостанция": {
-                "components": {
-                    "пассивка": 6,
-                    "радиолампы": 6,
-                },
-                "price": 5000,
-                "description": "Военная радиостанция"
-            },
-            "рлс_пво": {
-                "components": {
-                    "пассивка": 10,
-                    "радиолампы": 15,
-                },
-                "price": 15000,
-                "description": "РЛС ПВО"
-            },
-            "эвм_1": {
-                "components": {
-                    "пассивка": 100,
-                    "радиолампы": 100,
-                    "чбэлт": 1
-                },
-                "price": 50000,
-                "description": "ЭВМ первого поколения (ламповая)"
-            },
-            "радиоприемник_транзисторный": {
-                "components": {
-                    "пассивка": 8,
-                    "полупроводники": 6
-                },
-                "price": 800,
-                "description": "Транзисторный радиоприемник"
-            },
-            "телевизор_чб_транзисторный": {
-                "components": {
-                    "пассивка": 15,
-                    "полупроводники": 12,
-                    "чбэлт": 1
-                },
-                "price": 2000,
-                "description": "Черно-белый транзисторный телевизор"
-            },
-            "телевизор_цветной": {
-                "components": {
-                    "пассивка": 30,
-                    "полупроводники": 20,
-                    "цветнойэлт": 1,
-                    "ис": 5
-                },
-                "price": 5000,
-                "description": "Цветной телевизор"
-            },
-            "радиоприемник_гибридный": {
-                "components": {
-                    "пассивка": 6,
-                    "полупроводники": 4,
-                    "ис": 2
-                },
-                "price": 600,
-                "description": "Радиоприемник на микросхемах"
-            },
-            "эвм_2": {
-                "components": {
-                    "пассивка": 200,
-                    "полупроводники": 500,
-                    "чбэлт": 1,
-                    "нмл": 1
-                },
-                "price": 40000,
-                "description": "ЭВМ второго поколения (транзисторная)"
-            },
-            "эвм_3": {
-                "components": {
-                    "пассивка": 300,
-                    "ис": 200,
-                    "чбэлт": 1,
-                    "нмл": 2
-                },
-                "price": 35000,
-                "description": "ЭВМ третьего поколения (на микросхемах)"
-            },
-            "инженерный_калькулятор": {
-                "components": {
-                    "пассивка": 5,
-                    "ис": 3,
-                    "мис": 1,
-                },
-                "price": 2500,
-                "description": "Инженерный калькулятор"
-            },
-            "программируемый_калькулятор": {
-                "components": {
-                    "пассивка": 8,
-                    "ис": 5,
-                    "мис": 2,
-                    "сис": 1,
-                },
-                "price": 4000,
-                "description": "Программируемый калькулятор"
-            },
-            "эвм_4": {
-                "components": {
-                    "пассивка": 200,
-                    "бис": 50,
-                    "чбэлт": 1,
-                    "нгмд": 1
-                },
-                "price": 30000,
-                "description": "ЭВМ четвертого поколения (на БИС)"
-            },
-            "бытовой_компьютер": {
-                "components": {
-                    "пассивка": 30,
-                    "бис": 15,
-                    "чбэлт": 1,
-                    "нмл": 1
-                },
-                "price": 3000,
-                "description": "Бытовой компьютер с магнитофоном"
-            },
-            "персональный_компьютер": {
-                "components": {
-                    "пассивка": 30,
-                    "сис": 8,
-                    "нгмд": 2,
-                    "цветнойэлт": 1
-                },
-                "price": 8000,
-                "description": "Базовый персональный компьютер с дисководом"
-            },
-            "профессиональный_компьютер": {
-                "components": {
-                    "пассивка": 40,
-                    "сис": 12,
-                    "нгмд": 2,
-                    "нжмд": 1,
-                    "цветнойэлт": 1
-                },
-                "price": 12000,
-                "description": "Профессиональный компьютер с жестким диском"
-            },
-            "современный_компьютер": {
-                "components": {
-                    "пассивка": 50,
-                    "сис": 5,
-                    "бис": 10,
-                    "сбис": 15,
-                    "нгмд": 1,
-                    "нжмд": 1,
-                    "цветнойэлт": 1
-                },
-                "price": 15000,
-                "description": "Мощный компьютер на СБИС"
-            }
-        }
-        
-        # Статистика произведенных товаров
-        self.consumer_products_made = {}
-
-        self.five_year_plan = FiveYearPlan()
-
     def start(self):
         print("Добрый день! Вы - глава электронной промышленности СССР. Ваша задача - построить электронную промышленность СССР!")
         self.help_command();
@@ -410,7 +59,7 @@ class Game:
         # Обновляем баланс игрока
         self.rubles = self.rubles / ratio
         
-        # Обновляем базовые цены продуктов
+        # Обновляем базовые цены технологий
         for product in self.tecnologies.PRODUCT_PRICES:
             self.tecnologies.PRODUCT_PRICES[product] /= ratio
             
@@ -582,7 +231,7 @@ class Game:
         self.ui.divider('status')
 
     def process_command(self, command):
-        self.clear_screen()
+        self.ui.clear_screen()
         try:
             if command.strip().lower() in ["выход", "exit", "quit"]:
                 return "exit"
@@ -623,7 +272,7 @@ class Game:
                     print("Использование: собрать ТОВАР")
                     return "invalid"
                 # Проверяем существование товара перед сборкой
-                if parts[1].lower() not in self.CONSUMER_PRODUCTS:
+                if parts[1].lower() not in self.consumer_products.devices:
                     print(f"Неизвестный товар: {parts[1]}")
                     return "invalid"
                 self.assemble_consumer_product(parts[1].lower())
@@ -694,8 +343,6 @@ class Game:
         print(f"\n{c['bold']}{c['cyan']}Доступные команды:{c['end']}")
         print(f"{c['yellow']}помощь{c['end']} - вывести справку по командам")
         print(f"{c['yellow']}что_такое ТЕХНОЛОГИЯ{c['end']} - получить описание технологии")
-        print(f"{c['yellow']}план ГОД{c['end']} - начать пятилетний план")
-        print(f"{c['yellow']}отчет{c['end']} - вывести отчет о пятилетнем плане")
         print(f"{c['yellow']}исследовать ТЕХНОЛОГИЯ [ТЕХНОЛОГИЯ ...]{c['end']} - исследовать одну или несколько технологий")
         print(f"{c['yellow']}купить_технологию ТЕХНОЛОГИЯ{c['end']} - купить технологию за доллары")
         print(f"{c['yellow']}произвести ТЕХНОЛОГИЯ{c['end']} - произвести продукт")
@@ -777,10 +424,10 @@ class Game:
             
             # Получаем текущее количество продаж
             sales_count = self.tecnologies.technology_sales.get(tech_name, 0)
-            
+
             # Рассчитываем цену с учетом всех факторов
             price = self.calculate_depreciation(base_price, year_learned, tech_name)
-            
+
             self.dollars += price
             
             # Увеличиваем счетчик продаж
@@ -870,11 +517,11 @@ class Game:
 
     def show_tech_info(self, tech_name):
         c = self.ui.COLORS
-        if tech_name not in self.TECH_DESCRIPTIONS:
+        if tech_name not in self.tecnologies.TECH_DESCRIPTIONS:
             print(f"{c['red']}Информация о технологии '{tech_name}' не найдена.{c['end']}")
             return
 
-        tech_info = self.TECH_DESCRIPTIONS[tech_name]
+        tech_info = self.tecnologies.TECH_DESCRIPTIONS[tech_name]
         print(f"\n{c['bold']}{c['cyan']}Технология: {tech_name}{c['end']}")
         print(f"{c['white']}{tech_info['описание']}{c['end']}")
         
@@ -905,10 +552,10 @@ class Game:
 
     def can_produce_consumer_product(self, product_name):
         """Проверка возможности производства товара"""
-        if product_name not in self.CONSUMER_PRODUCTS:
+        if product_name not in self.consumer_products.devices:
             return False, "Неизвестный товар"
             
-        product = self.CONSUMER_PRODUCTS[product_name]
+        product = self.consumer_products.devices[product_name]
         tech_status = self.tecnologies.get_status()
         
         # Проверяем, освоены ли все необходимые технологии
@@ -926,11 +573,11 @@ class Game:
 
     def assemble_consumer_product(self, product_name):
         """Попытка собрать товар народного потребления"""
-        if product_name not in self.CONSUMER_PRODUCTS:
+        if product_name not in self.consumer_products.devices:
             self.ui.print(self.ui.red, f"Неизвестный товар: {product_name}")
             return False
             
-        product = self.CONSUMER_PRODUCTS[product_name]
+        product = self.consumer_products.devices[product_name]
         
         # Проверка возможности производства
         can_produce, reason = self.can_produce_consumer_product(product_name)
@@ -999,7 +646,7 @@ class Game:
         available_products = False
         tech_status = self.tecnologies.get_status()
         
-        for name, product in self.CONSUMER_PRODUCTS.items():
+        for name, product in self.consumer_products.devices.items():
             # Проверяем, освоены ли все необходимые технологии
             all_tech_available = True
             unavailable_tech = []
@@ -1055,10 +702,6 @@ class Game:
             return False
         return True
 
-    def clear_screen(self):
-        """Очищает экран"""
-        os.system('cls' if os.name == 'nt' else 'clear')
-
     def expand_production(self, currency="rubles"):
         """Расширяет производство за рубли или доллары"""
         if currency == "rubles":
@@ -1080,354 +723,6 @@ class Game:
         self.ui.print(self.ui.green, 
             f"Производство расширено! Новый множитель: x{self.production_multiplier}")
         return True
-
-
-class TechnologyTree:
-    def __init__(self):
-        # Add this line at the beginning of __init__
-        self.research_in_progress = {}
-        
-        # Дерево технологий: {название технологии: (уровень, доступный с года, год освоения)}
-        self.technologies = {
-            "пассивка": ("начальная", 1918, None),
-            "радиолампы": ("начальная", 1918, None),
-            "полупроводники": ("начальная", 1947, None),
-            "чбэлт": ("начальная", 1949, None),
-            "нмл": ("начальная", 1949, None),
-            "ис": ("начальная", 1961, None),
-            "цветнойэлт": ("начальная", 1967, None),
-            "мис": ("начальная", 1970, None),
-            "нгмд": ("начальная", 1971, None),
-            "сис": ("начальная", 1975, None),
-            "бис": ("начальная", 1980, None),
-            "нжмд": ("начальная", 1986, None),
-            "сбис": ("начальная", 1990, None),
-        }
-        
-        # Время исследования технологий
-        self.research_time = {
-            "пассивка": 0,
-            "радиолампы": 0,
-            "полупроводники": 1,
-            "чбэлт": 1,
-            "нмл": 1,
-            "ис": 1,
-            "цветнойэлт": 1,
-            "мис": 1,
-            "нгмд": 1,
-            "сис": 1,
-            "бис": 1,
-            "нжмд": 1,
-            "сбис": 1,
-        }
-
-        # Уровни технологии, связанные с каждой технологией
-        self.levels = {
-            "начальная": {
-                "upgrade": "средняя",
-                "description": "Базовый уровень технологии."
-            },
-            "средняя": {
-                "upgrade": "продвинутая",
-                "description": "Технология, которую освоили, с большими показателями производительности."
-            },
-            "продвинутая": {
-                "upgrade": None,
-                "description": "Максимальный уровень технологии."
-            }
-        }
-
-        # Ресурсы, необходимые для исследований
-        self.resources_required = {
-            "пассивка": 50,
-            "радиолампы": 150,
-            "полупроводники": 200,
-            "чбэлт": 250,
-            "нмл": 300,
-            "ис": 400,
-            "цветнойэлт": 500,
-            "мис": 350,
-            "нгмд": 300,
-            "сис": 450,
-            "бис": 600,
-            "нжмд": 700,
-            "сбис": 800,
-        }
-
-        # Добавляем словарь для отслеживания количества продаж каждой технологии
-        self.technology_sales = {}
-        
-        # Коэффициент ускорения устаревания за каждую продажу
-        self.SALES_DEPRECIATION_MULTIPLIER = 0.2  # 20% ускорение устаревания за каждую продажу
-
-        # Базовые цены для каждой технологии
-        self.TECH_PRICES = {
-            "пассивка": 500,        # Базовые компоненты
-            "радиолампы": 1000,     # Сложное производство
-            "полупроводники": 2000,  # Высокотехнологичное производство
-            "чбэлт": 1500,          # Сложная технология
-            "нмл": 1200,            # Механика + электроника
-            "ис": 2500,             # Высокая сложность
-            "цветнойэлт": 2000,     # Развитие ЧБ ЭЛТ
-            "мис": 3000,            # Развитие ИС
-            "нгмд": 1800,           # Развитие НМЛ
-            "сис": 3500,            # Развитие МИС
-            "бис": 4000,            # Развитие СИС
-            "нжмд": 2500,           # Развитие НГМД
-            "сбис": 5000            # Высшая сложность
-        }
-        
-        # Базовые цены производимых товаров
-        self.PRODUCT_PRICES = {
-            "пассивка": 800,        # Массовое производство
-            "радиолампы": 1500,     # Сложное производство
-            "полупроводники": 2500, # Высокотехнологичное производство
-            "чбэлт": 2000,         # Телевизоры и мониторы
-            "нмл": 1800,           # Накопители данных
-            "ис": 3000,            # Интегральные схемы
-            "цветнойэлт": 3500,    # Цветные телевизоры
-            "мис": 4000,           # Микросхемы
-            "нгмд": 2500,          # Дискеты
-            "сис": 5000,           # Сложные схемы
-            "бис": 6000,           # Большие схемы
-            "нжмд": 4000,          # Жесткие диски
-            "сбис": 8000           # Сверхбольшие схемы
-        }
-
-    def get_available_technologies(self, current_year):
-        """Возвращает список технологий, которые можно освоить в текущем году."""
-        available_technologies = []
-        for tech, (level, year_available, _) in self.technologies.items():
-            if current_year >= year_available:
-                status = ""
-                if tech in self.research_in_progress:
-                    years_spent = self.research_in_progress[tech]
-                    years_total = self.research_time[tech]
-                    status = f" (исследуется: {years_spent}/{years_total} лет)"
-                available_technologies.append(tech + status)
-        return available_technologies
-
-    def get_status(self):
-        """Возвращает статус освоенных технологий."""
-        status = {}
-        for tech, (level, year_available, year_learned) in self.technologies.items():
-            if year_learned is not None:  # Показать только освоенные технологии
-                status[tech] = {
-                    "уровень": level,
-                    "доступен с": year_available,
-                    "год освоения": year_learned,
-                    "описание": self.levels[level]["description"]
-                }
-            elif tech in self.research_in_progress:  # Добавляем информацию о текущих исследованиях
-                years_spent = self.research_in_progress[tech]
-                years_total = self.research_time[tech]
-                status[tech] = {
-                    "уровень": "исследуется",
-                    "прогресс": f"{years_spent}/{years_total} лет"
-                }
-        return status
-
-    def research(self, tech_name, available_rubles):
-        tech_name = tech_name.lower()
-        if tech_name in self.technologies:
-            current_level, year_available, year_learned = self.technologies[tech_name]
-            
-            # Проверяем, можно ли улучшить технологию
-            if current_level not in self.levels or self.levels[current_level]["upgrade"] is None:
-                print(f"{tech_name} уже достигла максимального уровня развития.")
-                return 0  # Возвращаем 0, так как деньги не потрачены
-                
-            if year_available > self.current_year:
-                print(f"{tech_name} еще недоступна. Можно освоить позже.")
-                return 0
-            
-            required_cost = self.resources_required[tech_name]
-            print(f"Стоимость исследования: {required_cost} руб.")
-                
-            if required_cost > available_rubles:
-                print(f"Недостаточно рублей для исследования. Доступно: {available_rubles} руб.")
-                return 0
-
-            # Проверяем, исследуется ли уже эта технология
-            if tech_name not in self.research_in_progress:
-                self.research_in_progress[tech_name] = 0
-                print(f"Начато исследование {tech_name}. Требуется лет: {self.research_time[tech_name]}")
-                return required_cost # Возвращаем стоимость исследования
-            
-            # Увеличиваем счетчик лет исследования
-            self.research_in_progress[tech_name] += 1
-            years_left = self.research_time[tech_name] - self.research_in_progress[tech_name]
-
-            if years_left > 0:
-                print(f"Исследование {tech_name} продолжается. Осталось лет: {years_left}")
-                return required_cost # Возвращаем стоимость исследования
-
-            # Исследование завершено
-            next_level = self.levels[current_level]["upgrade"]
-            self.technologies[tech_name] = (next_level, year_available, self.current_year)
-            del self.research_in_progress[tech_name] # Удаляем из списка исследуемых
-            print(f"{tech_name} улучшена до уровня {next_level}.")
-            return required_cost # Возвращаем 0, так как деньги не потрачены
-        else:
-            print("Технология не найдена.")
-            return 0 # Возвращаем 0, так как деньги не потрачены
-
-    def update_current_year(self, year):
-        self.current_year = year
-
-class FiveYearPlan:
-    def __init__(self):
-        self.plans = {
-            (1928, 1932): {
-                "name": "Первая пятилетка",
-                "goals": {"радиоприемник_ламповый": 1},
-                "completed": {}
-            },
-            (1933, 1937): {
-                "name": "Вторая пятилетка",
-                "goals": {"радиоприемник_ламповый": 1},
-                "completed": {}
-            },
-            (1938, 1942): {
-                "name": "Третья пятилетка",
-                "goals": {"военная_радиостанция": 1},
-                "completed": {}
-            },
-            (1942, 1945): {
-                "name": "Военное время",
-                "goals": {"рлс_пво": 1},
-                "completed": {}
-            },
-            (1946, 1950): {
-                "name": "Четвертая пятилетка",
-                "goals": {"радиоприемник_ламповый": 1},
-                "completed": {}
-            },
-            (1951, 1955): {
-                "name": "Пятая пятилетка",
-                "goals": {"телевизор_чб_ламповый": 1},
-                "completed": {}
-            },
-            (1956, 1960): {
-                "name": "Шестая пятилетка",
-                "goals": {"эвм_1": 1},
-                "completed": {}
-            },
-            (1961, 1965): {
-                "name": "Седьмая пятилетка",
-                "goals": {"эвм_3": 1},
-                "completed": {}
-            },
-            (1966, 1970): {
-                "name": "Восьмая пятилетка",
-                "goals": {"телевизор_цветной": 1},
-                "completed": {}
-            },
-            (1971, 1975): {
-                "name": "Девятая пятилетка",
-                "goals": {"инженерный_калькулятор": 1},
-                "completed": {}
-            },
-            (1976, 1980): {
-                "name": "Десятая пятилетка",
-                "goals": {"бытовой_компьютер": 1},
-                "completed": {}
-            },
-            (1981, 1985): {
-                "name": "Десятая пятилетка",
-                "goals": {"персональный_компьютер": 1},
-                "completed": {}
-            },
-            (1986, 1990): {
-                "name": "Одинадцатая пятилетка",
-                "goals": {"профессиональный_компьютер": 1},
-                "completed": {}
-            }
-
-        }
-        self.current_plan = None
-        self.OVERACHIEVEMENT_BONUS = 0.002  # Увеличение темпа роста при перевыполнении
-
-    def check_plan_end(self, year):
-        """Проверяет, закончился ли текущий план"""
-        if not self.current_plan:
-            return False
-        _, end_year = self.current_plan
-        return year > end_year
-
-    def start_plan(self, year):
-        """Начинает новый план, если для года существует пятилетка"""
-        for period, plan in self.plans.items():
-            start_year, end_year = period
-            if start_year <= year <= end_year:
-                self.current_plan = period
-                if not plan["completed"]:
-                    plan["completed"] = {product: 0 for product in plan["goals"]}
-                return True
-        return False
-
-    def add_production(self, product_name, amount=1):
-        """Учитывает произведенную продукцию в текущем плане"""
-        if not self.current_plan or product_name not in self.plans[self.current_plan]["goals"]:
-            return False
-        
-        self.plans[self.current_plan]["completed"][product_name] += amount
-        return True
-
-    def check_completion(self, population_stats):
-        """Проверяет выполнение текущего плана"""
-        if not self.current_plan:
-            return None
-        
-        plan = self.plans[self.current_plan]
-        all_completed = True
-        overachieved = True
-        
-        for product, required in plan["goals"].items():
-            completed = plan["completed"].get(product, 0)
-            if completed < required:
-                all_completed = False
-                overachieved = False
-                break
-            elif completed == required:
-                overachieved = False
-        
-        if overachieved:
-            # Увеличиваем темп роста населения при перевыполнении
-            population_stats.growth_rate += self.OVERACHIEVEMENT_BONUS
-        
-        return all_completed
-
-    def get_status(self):
-        """Возвращает статус текущего плана"""
-        if not self.current_plan:
-            return "Нет текущего плана"
-        
-        plan = self.plans[self.current_plan]
-        start_year, end_year = self.current_plan
-        status = [f"\n{plan['name']} ({start_year}-{end_year}):"]
-        
-        for product, required in plan["goals"].items():
-            completed = plan["completed"].get(product, 0)
-            status.append(f"  • {product}: {completed}/{required}")
-        
-        return "\n".join(status)
-
-class PopulationStats:
-    def __init__(self):
-        self.initial_population = 150  # Начальное население в млн (1926 год)
-        self.growth_rate = 0.01  # Темп роста
-        self.base_year = 1926  # Базовый год для расчета
-        self.population = self.initial_population  # Текущее население
-
-    def update_population(self, current_year):
-        years_passed = current_year - self.base_year
-        self.population = self.initial_population * np.exp(self.growth_rate * years_passed)
-        return self.population
-
-    def get_population(self):
-        return round(self.population, 2)  # Округляем до 2 знаков после запятой
-
 
 if __name__ == "__main__":
     game = Game()
